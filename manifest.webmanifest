@@ -1,0 +1,15 @@
+{
+  "name": "LUMI – AI Wellness Companion",
+  "short_name": "LUMI",
+  "description": "Healthy Today. Brighter Tomorrow.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EAF6FF",
+  "theme_color": "#00B8D9",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
