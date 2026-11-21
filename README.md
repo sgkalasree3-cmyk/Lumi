@@ -35,6 +35,7 @@ May work in a phone file manager/browser; camera upload and storage can be restr
 - **Live mode:** Device tab → enter ESP32 address → **Save & test**. If nothing valid arrives, LUMI shows "—"/"No data" (it never falls back to demo numbers).
 - **Skin:** Take/upload a photo. Simple on-device image statistics are shown as *experimental visible observations*. No diagnosis, no upload.
 - **Assistant:** local rules-based helper (no cloud AI). Explains available readings, gives general wellness tips, refuses diagnoses, and points to emergency services for urgent symptoms.
+- **Wellness Assessment (Home → Wellness Assessment card):** 20 multiple-choice questions (one at a time, with "Question N of 20", Previous/Next, auto-saved progress you can resume). Afterwards it builds a summary from your actual answers: habit score, per-area bars, strengths, focus areas and general non-medical suggestions. Results are stored on the phone, can be reopened later, and exported with **Save as PDF / Print**. It is self-reported habits only: no diagnosis, and it does not use sensor readings.
 - **Reports:** save snapshots (stored in the browser's localStorage), view/delete them. 3 clearly labelled **DEMO SAMPLE** reports are pre-loaded.
   - **PDF:** uses the browser print dialog → "Save as PDF".
   - **Email (requires email configuration):** opens your phone's email app via `mailto:` with the text pre-filled. No attachment; LUMI cannot send email itself.

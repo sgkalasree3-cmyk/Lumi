@@ -109,6 +109,19 @@ nav button.on svg{stroke:var(--cyan-d)}
 .sheet{background:#fff;width:100%;max-width:520px;max-height:88dvh;overflow-y:auto;border-radius:26px 26px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 18px)}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:#0F2A3A;color:#fff;padding:10px 16px;border-radius:99px;font-size:13px;z-index:30;opacity:0;pointer-events:none;transition:.25s;max-width:90%;text-align:center}
 .toast.on{opacity:1}
+/* wellness assessment */
+.opt{display:block;width:100%;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;font-size:15px;cursor:pointer;color:var(--ink)}
+.opt.on{border-color:var(--cyan);background:var(--sky);color:var(--cyan-d);font-weight:650;box-shadow:0 0 0 3px rgba(0,184,217,.15)}
+.linkbtn{background:none;border:none;color:var(--cyan-d);font-weight:650;padding:12px;cursor:pointer;width:100%}
+.tip{border-left:4px solid var(--cyan);background:var(--sky);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:13.5px;line-height:1.45}
+.tip small{display:block;color:var(--mute);margin-bottom:3px;font-size:12px}
+.pill{display:inline-block;background:var(--sky);color:var(--cyan-d);border-radius:99px;padding:6px 11px;font-size:12.5px;font-weight:650;margin:0 6px 6px 0}
+details summary{cursor:pointer;font-weight:650;padding:4px 0}
+.assess-card{background:linear-gradient(135deg,#fff 0%,#EAF6FF 100%)}
+@media print{
+  #printArea .card{box-shadow:none;border:1px solid #ccd;break-inside:avoid;margin-bottom:10px;padding:10px}
+  #printArea .bar,#printArea .bar i,#printArea .tip,#printArea .pill{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 #printArea{display:none}
 @media print{
   html,body{height:auto;overflow:visible;background:#fff}
@@ -139,6 +152,15 @@ nav button.on svg{stroke:var(--cyan-d)}
           <div><b id="hDevTitle">Device</b><div class="sub" style="margin:2px 0 0" id="hDevSub"></div></div>
           <span class="sp"></span>
           <button class="btn ghost" data-go="device" style="padding:8px 12px">Manage</button>
+        </div>
+      </div>
+
+      <div class="card assess-card">
+        <div class="row">
+          <span class="m-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00B8D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 13l2 2 4-4"/></svg></span>
+          <div><b>Wellness Assessment</b><div class="note" id="assessCardSub">20 questions · about 3 minutes</div></div>
+          <span class="sp"></span>
+          <button class="btn" id="assessCardBtn" data-go="assess" style="padding:10px 14px">Start</button>
         </div>
       </div>
 
@@ -241,6 +263,8 @@ nav button.on svg{stroke:var(--cyan-d)}
         <button class="btn danger wide" id="btnReset">Reset all saved LUMI data</button>
       </div>
     </section>
+    <!-- WELLNESS ASSESSMENT -->
+    <section class="view" id="v-assess"><div id="assessBody"></div></section>
   </main>
 
   <nav id="nav">
@@ -291,9 +315,11 @@ if(!Array.isArray(S.reports)){S.reports=seedReports();store.set("reports",S.repo
 function go(v){
   S.view=v;
   $$(".view").forEach(e=>e.classList.toggle("on",e.id==="v-"+v));
-  $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.go===v));
+  $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.go===(v==="assess"?"home":v)));
   $("#main").scrollTop=0;
   if(v==="reports")renderReports();
+  if(v==="assess")renderAssess();
+  if(v==="home")updateAssessCard();
   if(v==="device")renderDeviceForm();
   updateLive();
 }
@@ -641,10 +667,205 @@ $("#chatClear").onclick=()=>{log.innerHTML="";welcome()};
 });
 welcome();
 
+/* ============ LUMI Wellness Assessment ============ */
+/*A-PURE-START*/
+const CATS={
+  sleep:{n:"Sleep",i:"🌙"},hydration:{n:"Hydration",i:"💧"},activity:{n:"Physical activity",i:"🏃"},
+  nutrition:{n:"Nutrition",i:"🥗"},screen:{n:"Screen time",i:"📱"},stress:{n:"Stress & relaxation",i:"🧘"},
+  energy:{n:"Energy",i:"⚡"},skin:{n:"Skincare",i:"🧴"},sun:{n:"Sun exposure",i:"☀️"},general:{n:"General wellness",i:"💙"}
+};
+// Each option is [label, points 0-3]; 3 = habit most often linked with wellbeing. Self-reported habits only.
+const AQ=[
+ {c:"sleep",q:"On most nights, about how many hours do you sleep?",o:[["Less than 5 hours",0],["5–6 hours",1],["7–9 hours",3],["More than 9 hours",2]],
+  tip:"Many adults feel best with about 7–9 hours. Try moving your bedtime 15 minutes earlier every few nights until you wake up feeling rested."},
+ {c:"sleep",q:"How regular are your bedtime and wake-up time?",o:[["Very irregular",0],["Somewhat irregular",1],["Mostly regular",2],["Very consistent",3]],
+  tip:"Aim for a similar bed and wake time every day, including weekends. A steady rhythm often helps sleep quality."},
+ {c:"hydration",q:"On a typical day, how many glasses (about 250 ml each) of water or other non-sugary fluids do you drink?",n:"Needs vary with weather, activity and body size; this is a rough guide.",
+  o:[["0–2 glasses",0],["3–4 glasses",1],["5–7 glasses",2],["8 or more",3]],
+  tip:"Keep a bottle within reach and sip through the day. Thirst and pale-yellow urine are common rough guides to hydration."},
+ {c:"hydration",q:"How often do you have sugary drinks (soft drinks, sweetened juices, energy drinks)?",o:[["Several times a day",0],["About once a day",1],["A few times a week",2],["Rarely or never",3]],
+  tip:"Swap one sugary drink a day for water, sparkling water or unsweetened tea."},
+ {c:"activity",q:"On how many days a week do you do at least 30 minutes of moderate activity (brisk walking, cycling, sports)?",o:[["None",0],["1–2 days",1],["3–4 days",2],["5 or more days",3]],
+  tip:"Start small: a 10-minute brisk walk after meals adds up. Build gradually toward about 150 minutes of moderate activity a week."},
+ {c:"activity",q:"How much of your day do you spend sitting?",o:[["10 or more hours",0],["7–9 hours",1],["4–6 hours",2],["Less than 4 hours",3]],
+  tip:"Stand up and move for a minute or two every 30–60 minutes. Try a walking phone call or a quick stretch break."},
+ {c:"nutrition",q:"How many portions of fruit and vegetables do you eat on a typical day?",o:[["0–1",0],["2",1],["3–4",2],["5 or more",3]],
+  tip:"Add one extra portion to a meal you already eat, such as fruit with breakfast or a vegetable side at dinner."},
+ {c:"nutrition",q:"How often do you eat fried, packaged or highly processed foods?",o:[["Daily or more",0],["Most days",1],["A few times a week",2],["Rarely",3]],
+  tip:"Keep fresh fruit, nuts or roasted chickpeas handy for snack time, and save fried or packaged foods for occasional treats."},
+ {c:"screen",q:"Outside of work or study, how much time do you spend on screens (phone, TV, games, social media) each day?",o:[["6 or more hours",0],["4–6 hours",1],["2–4 hours",2],["Less than 2 hours",3]],
+  tip:"Set a daily screen-time goal and take short breaks. Try the 20-20-20 habit: every 20 minutes, look at something about 6 metres away for 20 seconds."},
+ {c:"screen",q:"How often do you use a phone or other screen in the hour before bed?",o:[["Every night",0],["Most nights",1],["Sometimes",2],["Rarely or never",3]],
+  tip:"Try putting screens away 30–60 minutes before bed and use that time for reading, stretching or quiet music."},
+ {c:"stress",q:"In the past two weeks, how often have you felt overwhelmed by your daily responsibilities?",o:[["Almost every day",0],["More than half the days",1],["Some days",2],["Rarely or never",3]],
+  tip:"Break big tasks into small steps, write down your top priorities and take short pauses. Talking with someone you trust can also help."},
+ {c:"stress",q:"How often do you do something to unwind (slow breathing, music, hobbies, time outdoors)?",o:[["Rarely or never",0],["A few times a month",1],["A few times a week",2],["Almost daily",3]],
+  tip:"Schedule a few minutes of relaxation each day, such as slow breathing (in for 4 seconds, out for 6), a walk outside or a hobby you enjoy."},
+ {c:"energy",q:"How would you describe your energy levels on most days?",o:[["Very low",0],["Often low",1],["Fairly good",2],["Good and steady",3]],
+  tip:"Steady energy often follows regular sleep, meals, water and movement. Improve one of these first and notice the difference."},
+ {c:"energy",q:"How often do you feel drained or sluggish during the day?",o:[["Almost daily",0],["Often",1],["Sometimes",2],["Rarely",3]],
+  tip:"Notice when the slump hits. A short walk, a glass of water, daylight and a balanced snack can help; avoid caffeine late in the day."},
+ {c:"skin",q:"How consistent is your basic skincare routine (cleansing and moisturising)?",o:[["I don't have one",0],["Occasionally",1],["Most days",2],["Daily",3]],
+  tip:"A simple routine is enough: a gentle cleanser, a moisturiser and sunscreen in the daytime. Choose products that suit your skin."},
+ {c:"skin",q:"How often do you wash your face or cleanse your skin after sweating or before bed?",o:[["Rarely",0],["Sometimes",1],["Often",2],["Almost always",3]],
+  tip:"Gently wash your face after heavy sweating and before bed, using lukewarm water and a mild cleanser."},
+ {c:"sun",q:"When you're outdoors in daylight, how often do you use sunscreen, a hat or shade?",o:[["Never",0],["Rarely",1],["Often",2],["Almost always",3]],
+  tip:"Use a broad-spectrum sunscreen (SPF 30 or higher) on exposed skin, and add a hat, sunglasses and shade when the sun is strong."},
+ {c:"sun",q:"How much time do you spend in strong midday sun (about 10 am–4 pm) without protection?",o:[["More than 3 hours",0],["1–3 hours",1],["Less than 1 hour",2],["Almost none",3]],
+  tip:"Plan outdoor time earlier or later in the day when you can, and seek shade between about 10 am and 4 pm."},
+ {c:"general",q:"How often do you spend time with people you enjoy (in person, by call or video)?",o:[["Rarely",0],["A few times a month",1],["About weekly",2],["Several times a week",3]],
+  tip:"Reach out to a friend or family member this week, or join an activity you enjoy. Connection is part of wellbeing."},
+ {c:"general",q:"Overall, how would you rate your current wellness habits?",o:[["Poor",0],["Fair",1],["Good",2],["Excellent",3]],
+  tip:"Pick one small habit from your focus areas and try it for a week. Small, steady changes tend to last."}
+];
+function assessCompute(ans){
+  const items=AQ.map((q,i)=>{
+    const a=Array.isArray(ans)&&Number.isInteger(ans[i])&&ans[i]>=0&&ans[i]<q.o.length?ans[i]:null;
+    return{i,c:q.c,q:q.q,tip:q.tip,a,label:a==null?null:q.o[a][0],score:a==null?null:q.o[a][1]};
+  });
+  if(items.some(x=>x.score==null))return null;
+  const max=items.length*3,total=items.reduce((s,x)=>s+x.score,0),pct=Math.round(total/max*100);
+  const band=pct>=80?{t:"Strong everyday habits",d:"Your answers describe many healthy routines. Keep them up, and give a little attention to any areas listed below."}
+    :pct>=60?{t:"A good foundation",d:"You have a number of helpful habits in place. A few small changes could make your routine even stronger."}
+    :pct>=40?{t:"Room to grow",d:"You already have some helpful habits, and a few small, steady changes could make a real difference."}
+    :{t:"A fresh start",d:"Your answers point to several areas where small, gradual changes may help. Choose one or two to begin with."};
+  const cats=Object.keys(CATS).map(k=>{
+    const it=items.filter(x=>x.c===k),s=it.reduce((a,x)=>a+x.score,0),m=it.length*3;
+    return{key:k,score:s,max:m,pct:Math.round(s/m*100)};
+  });
+  const strengths=cats.filter(c=>c.pct>=83);
+  let focus=cats.filter(c=>c.pct<=50).sort((a,b)=>a.pct-b.pct).slice(0,3);
+  if(!focus.length)focus=cats.filter(c=>c.pct<83).sort((a,b)=>a.pct-b.pct).slice(0,2);
+  const bySc=[...items].sort((a,b)=>a.score-b.score||a.i-b.i);
+  let ti=bySc.filter(x=>x.score<=1).slice(0,6);
+  if(ti.length<3)ti=ti.concat(bySc.filter(x=>x.score===2).slice(0,3-ti.length));
+  const tips=ti.map(x=>({cat:x.c,ans:x.label,text:x.tip,i:x.i}));
+  const support=items[10].score<=1;
+  return{items,total,max,pct,band,cats,strengths,focus,tips,support};
+}
+/*A-PURE-END*/
+
+const A={idx:0,answers:Array(AQ.length).fill(null),mode:"intro",rec:null};
+S.assessments=store.get("assessments",[]);
+if(!Array.isArray(S.assessments))S.assessments=[];
+function cleanAns(a){return AQ.map((q,i)=>Array.isArray(a)&&Number.isInteger(a[i])&&a[i]>=0&&a[i]<q.o.length?a[i]:null)}
+function getDraft(){
+  const d=store.get("assessDraft",null);if(!d)return null;
+  const ans=cleanAns(d.answers);if(!ans.some(x=>x!=null))return null;
+  return{idx:clamp(Number.isInteger(d.idx)?d.idx:0,0,AQ.length-1),answers:ans};
+}
+function saveDraft(){store.set("assessDraft",{idx:A.idx,answers:A.answers})}
+function clearDraft(){try{localStorage.removeItem("lumi.assessDraft")}catch(e){}}
+const A_DISCLAIMER="LUMI's Wellness Assessment reflects your self-reported habits only. It is not a medical test, does not diagnose or screen for any condition, and does not replace advice from a qualified healthcare professional.";
+
+function updateAssessCard(){
+  const sub=$("#assessCardSub"),btn=$("#assessCardBtn");if(!sub||!btn)return;
+  const d=getDraft(),last=S.assessments[0];
+  if(d){sub.textContent="In progress · "+d.answers.filter(x=>x!=null).length+" of "+AQ.length+" answered";btn.textContent="Resume"}
+  else if(last){const r=assessCompute(cleanAns(last.answers));sub.textContent="Last completed "+fmtDate(last.completed)+(r?" · habit score "+r.pct+"%":"");btn.textContent="Open"}
+  else{sub.textContent=AQ.length+" questions · about 3 minutes";btn.textContent="Start"}
+}
+function renderAssess(keepScroll){
+  const el=$("#assessBody");
+  el.innerHTML=A.mode==="question"?qHTML():(A.mode==="summary"&&A.rec)?summaryHTML(A.rec):introHTML();
+  if(!keepScroll)$("#main").scrollTop=0;
+}
+function introHTML(){
+  const d=getDraft();
+  const hist=S.assessments.map(r=>{
+    const c=assessCompute(cleanAns(r.answers));
+    return `<div class="card rep" data-act="view" data-id="${esc(r.id)}"><div class="row"><span class="t">${esc(fmtDate(r.completed))}</span><span class="sp"></span><span class="tag live">${c?"SCORE "+c.pct+"%":"INCOMPLETE"}</span></div><div class="note" style="margin-top:6px">${c?esc(c.band.t):"This saved result can't be read"}</div></div>`;
+  }).join("");
+  return `<h1>Wellness Assessment</h1>
+  <p class="sub">A quick check-in on your everyday habits, with general, non-medical suggestions.</p>
+  <div class="card hero"><h2 style="color:#fff;font-size:18px">LUMI Wellness Assessment</h2>
+    <p class="sub">${AQ.length} multiple-choice questions · about 3 minutes. Covers sleep, hydration, activity, nutrition, screen time, stress, energy, skincare, sun exposure and general wellness.</p>
+    <div class="actions">${d?`<button class="btn ghost" data-act="resume">Resume (question ${d.idx+1})</button><button class="btn ghost" data-act="start">Start over</button>`:`<button class="btn ghost" data-act="start">Start assessment</button>`}</div></div>
+  <div class="warnbox">${esc(A_DISCLAIMER)} It doesn't use your sensor readings.</div>
+  ${hist?`<h2 style="margin:16px 2px 8px">Completed assessments</h2>${hist}`:""}`;
+}
+function qHTML(){
+  const q=AQ[A.idx],n=A.idx+1,sel=A.answers[A.idx],ansd=A.answers.filter(x=>x!=null).length;
+  return `<div class="row" style="margin:6px 2px 10px"><b>Question ${n} of ${AQ.length}</b><span class="sp"></span><span class="tag">${esc(CATS[q.c].n.toUpperCase())}</span></div>
+  <div class="bar" style="margin:0 2px 14px"><i style="width:${(n/AQ.length*100).toFixed(0)}%"></i></div>
+  <div class="card"><h2 style="font-size:18px;line-height:1.4;margin-bottom:12px">${esc(q.q)}</h2>${q.n?`<p class="note" style="margin:-4px 0 12px">${esc(q.n)}</p>`:""}
+    ${q.o.map((o,j)=>`<button type="button" class="opt${sel===j?" on":""}" data-act="opt" data-i="${j}">${esc(o[0])}</button>`).join("")}</div>
+  <div class="actions"><button class="btn ghost" data-act="prev" ${A.idx===0?"disabled":""}>← Previous</button><button class="btn" data-act="next" ${sel==null?"disabled":""}>${n===AQ.length?"Finish ✓":"Next →"}</button></div>
+  <p class="note" style="text-align:center;margin-top:10px">${ansd} of ${AQ.length} answered · saved automatically</p>
+  <button class="linkbtn" data-act="exit">Save &amp; exit</button>`;
+}
+function ringSvg(p){
+  const c=2*Math.PI*52;
+  return `<svg viewBox="0 0 120 120" width="112" height="112" style="flex:none"><circle cx="60" cy="60" r="52" fill="none" stroke="#D6EEFB" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="#00B8D9" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(c*p/100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 60 60)"/><text x="60" y="67" text-anchor="middle" font-size="24" font-weight="700" fill="#0B2A3C">${p}%</text></svg>`;
+}
+function assessBody(res,print){
+  const catBars=res.cats.map(c=>`<div style="margin:12px 0"><div class="row"><span>${CATS[c.key].i} ${esc(CATS[c.key].n)}</span><span class="sp"></span><b>${c.score}/${c.max}</b></div><div class="bar"><i style="width:${c.pct}%"></i></div></div>`).join("");
+  const pills=l=>l.map(c=>`<span class="pill">${CATS[c.key].i} ${esc(CATS[c.key].n)}</span>`).join("");
+  let h=`<div class="card"><h2>Habits by area</h2>${catBars}</div>`;
+  h+=`<div class="card"><h2>What's going well</h2>`+(res.strengths.length?pills(res.strengths)+`<p class="note">Your answers in these areas describe habits that many wellness guides encourage.</p>`:`<p class="note">No area reached the top level yet, which is completely fine. Pick one small change below to build momentum.</p>`)+`</div>`;
+  h+=`<div class="card"><h2>Areas to focus on</h2>`+(res.focus.length?pills(res.focus)+`<p class="note">These areas scored lowest in your answers, so small changes here may help most.</p>`:`<p class="note">Nothing stands out as a weak area in your answers. Keep your routines consistent.</p>`)+`</div>`;
+  h+=`<div class="card"><h2>Personalised suggestions</h2>`+(res.tips.length?res.tips.map(t=>`<div class="tip"><small>${CATS[t.cat].i} ${esc(CATS[t.cat].n)} · you answered: “${esc(t.ans)}”</small>${esc(t.text)}</div>`).join("")
+    :`<p class="note">Your answers don't point to specific changes. Keep up your routines and retake the assessment in a few weeks.</p>`)+`<p class="note">These are general wellness ideas, not medical advice.</p></div>`;
+  if(res.support)h+=`<div class="warnbox">You said you've often felt overwhelmed recently. This isn't a diagnosis, but if it keeps affecting your daily life, consider talking with someone you trust, a counsellor or a healthcare professional. If you ever feel unsafe or in crisis, contact local emergency services (112 in India).</div>`;
+  const rows=res.items.map(x=>`<div class="kv"><span>${x.i+1}. ${esc(x.q)}</span><span>${esc(x.label)}</span></div>`).join("");
+  h+=print?`<div class="card"><h2>Your answers</h2>${rows}</div>`:`<div class="card"><details><summary>Your answers (${res.items.length})</summary>${rows}</details></div>`;
+  return h;
+}
+function summaryHTML(rec){
+  const res=assessCompute(cleanAns(rec.answers));
+  if(!res)return `<div class="card">This saved assessment is incomplete.</div><button class="btn wide" data-act="back">Back</button>`;
+  return `<h1>Your wellness summary</h1><p class="sub">Completed ${esc(fmtDate(rec.completed))} · based only on your answers</p>
+  <div class="card"><div class="row" style="gap:16px">${ringSvg(res.pct)}<div><b style="font-size:18px">${esc(res.band.t)}</b><p class="sub" style="margin:6px 0 0">${esc(res.band.d)}</p></div></div>
+    <p class="note" style="margin-top:10px">Habit score: ${res.total} of ${res.max} points from your self-reported habits. This is not a health measurement.</p></div>`
+  +assessBody(res,false)+
+  `<div class="warnbox">${esc(A_DISCLAIMER)}</div>
+  <div class="actions"><button class="btn" data-act="pdf">Save as PDF / Print</button><button class="btn ghost" data-act="retake">Retake</button></div>
+  <div class="actions" style="margin-top:10px"><button class="btn ghost" data-act="back">All assessments</button><button class="btn ghost" data-act="home">Dashboard</button></div>
+  <button class="linkbtn" data-act="del" style="color:var(--bad)">Delete this result</button>`;
+}
+function printAssessment(rec){
+  const res=rec&&assessCompute(cleanAns(rec.answers));
+  if(!res){toast("Assessment is incomplete");return}
+  $("#printArea").innerHTML=`<h1>LUMI – Wellness Assessment</h1><p>Healthy Today. Brighter Tomorrow.</p><p>Completed: ${esc(fmtDate(rec.completed))}</p>
+    <h2>${esc(res.band.t)} · habit score ${res.pct}% (${res.total}/${res.max})</h2><p>${esc(res.band.d)}</p>`+assessBody(res,true)+`<p style="font-size:12px;color:#555">${esc(A_DISCLAIMER)}</p>`;
+  window.print();
+}
+function finishAssess(){
+  const miss=A.answers.findIndex(x=>x==null);
+  if(miss>=0){A.idx=miss;renderAssess();toast("Please answer question "+(miss+1));return}
+  const rec={id:"a"+Date.now(),completed:Date.now(),answers:[...A.answers]};
+  S.assessments.unshift(rec);S.assessments=S.assessments.slice(0,20);store.set("assessments",S.assessments);
+  clearDraft();A.rec=rec;A.mode="summary";renderAssess();updateAssessCard();toast("Assessment saved");
+}
+function startAssess(){A.answers=Array(AQ.length).fill(null);A.idx=0;A.mode="question";clearDraft();renderAssess()}
+$("#assessBody").addEventListener("click",e=>{
+  const t=e.target.closest("[data-act]");if(!t||t.disabled)return;
+  const act=t.dataset.act;
+  if(act==="start"||act==="retake")startAssess();
+  else if(act==="resume"){const d=getDraft();if(d){A.answers=d.answers;A.idx=d.idx}A.mode="question";renderAssess()}
+  else if(act==="opt"){A.answers[A.idx]=+t.dataset.i;saveDraft();renderAssess(true)}
+  else if(act==="prev"){if(A.idx>0){A.idx--;saveDraft();renderAssess()}}
+  else if(act==="next"){
+    if(A.answers[A.idx]==null)return;
+    if(A.idx<AQ.length-1){A.idx++;saveDraft();renderAssess()}else finishAssess();
+  }
+  else if(act==="exit"){saveDraft();A.mode="intro";renderAssess();updateAssessCard();toast("Progress saved")}
+  else if(act==="view"){const r=S.assessments.find(x=>x.id===t.dataset.id);if(r){A.rec=r;A.mode="summary";renderAssess()}}
+  else if(act==="pdf")printAssessment(A.rec);
+  else if(act==="back"){A.mode="intro";renderAssess()}
+  else if(act==="home")go("home");
+  else if(act==="del"){
+    if(!A.rec||!confirm("Delete this assessment result?"))return;
+    S.assessments=S.assessments.filter(x=>x.id!==A.rec.id);store.set("assessments",S.assessments);
+    A.rec=null;A.mode="intro";renderAssess();updateAssessCard();toast("Deleted");
+  }
+});
+
 /* ============ boot ============ */
 if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"||location.hostname==="127.0.0.1")){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
+updateAssessCard();
 restart();
 </script>
 </body>
